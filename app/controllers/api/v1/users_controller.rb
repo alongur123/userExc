@@ -4,79 +4,83 @@ module Api
             include ActionController::Cookies
 
             before_action :set_user
+
             def index
-                user = User.order('created_at DESC');
-                render json: {status: 'Success', data: user}, status: :ok;
+                user = User.order(created_at: :desc);
+                render json: {status: 'Success', data: user};
             end
 
             def show                
                 begin
-                    user = User.find(params.fetch(:id));                
+                    user = User.find_by(id: params.fetch(:id));                
                     render json: {status: 'Success', data: user}, status: :ok;                
                 rescue
-                    render :status => 404, json: {data: 'error', status: 'Not Found'}
+                    render json: {data: 'error', status: 'Not Found'}
                 end
             end
 
             def create
-                begin
-                    user = User.create(user_params)
-                    render json: {status: 200, data: user}, status: :ok;
-                rescue
-                    render json: {status: 500, data: user.errors}, status: :unprocessable_entity;
+                user = User.create(user_params)
+                if user.errors.inspect
+                    render json: {status: 500, data: user.errors};
+                else
+                    render json: {status: 200, data: user};
                 end                
             end
 
             def destroy
-                user = User.find(params.fetch(:id));
+                user = User.find_by(id: params.fetch(:id));
                 user.destroy
-                render json: {status: 'Success', data: user}, status: :ok;
-
+                render json: {status: 'Success', data: user};
             end
 
             def update
                 
                 # Check if user is login
-                if @service && @service.isIdIsCurrentLogIn(update_param.fetch('id'))
-                    user = @service.updateUser(user_params)
+                if @service && @service.check_current_user(update_param.fetch('id', nil), cookies.fetch('token', nil))
+                    user = @service.update_user(user_params)
                     if user
                         render json: {status: 'Success', data: user}
                     else
-                        render json: {status: 'ERROR', data: 'error in update user'}, status: :unprocessable_entity;
+                        render json: {status: 'ERROR', data: 'error in update user'};
                     end
                 else
-                    render json: {status: 'ERROR', data: 'user is not log in'}, status: :unauthorized;
+                    render json: {status: :unauthorized, data: 'user is not log in'};
                 end
             end
 
-            def signIn
+            def sign_in
+                if @service == nil
 
-                # sign in and create cookies if authenticate
-                @service = UsersService.new(nil, signIn_params.fetch(:email, nil), signIn_params.fetch(:password, nil))              
-                if @service.isAuthenticate()
-                    @service.addTokenToCookie(cookies)
-                    puts cookies
-                    render json: {status: 'Success', data: "signIn"}
+                    # sign in and create cookies if authenticate
+                    @service = UsersService.new(nil, sign_in_params.fetch(:email, nil))              
+                    if @service.is_authenticate(sign_in_params.fetch(:password, nil))
+                        user = @service.add_token_to_cookie(cookies)
+                        render json: {status: 'Success', data: user}
+                    else
+                        render json: {status: :unauthorized, data: "email or password incorrect"}
+                    end
                 else
-                    render json: {status: 'ERROR', data: "email or password incorrect"}, status: :unauthorized;
+                    render json: {status: 'Success', data: "already signed in"}
                 end
             end
 
-            def signOut
+            def sign_out
                 # check if we signed in 
                 if @service != nil
 
                     # remove the cookies
-                    @service.deleteCookie(cookies)
-                    puts cookies
+                    @service.delete_cookie(cookies)
+                    render json: {status: 'Success', data: "signed 0ut"}
+                else 
+                    render json: {status: 'Success', data: "there is no user signed in"} 
                 end
-                render json: {status: 'Success', data: "signOut"}
             end
 
             def set_user
-                @user_id = cookies.fetch('user_id', nil)
-                if @user_id
-                    @service = UsersService.new(@user_id)
+                token = cookies.fetch('token', nil)
+                if token
+                    @service = UsersService.new(token)
                 end
             end
 
@@ -85,7 +89,7 @@ module Api
                 params.permit(:first_name, :last_name, :email, :password)
             end
 
-            def signIn_params
+            def sign_in_params
                 params.permit(:email, :password)
             end
 
