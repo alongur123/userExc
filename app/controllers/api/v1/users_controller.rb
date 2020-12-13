@@ -3,20 +3,21 @@ module Api
         class UsersController < ApplicationController
             include ActionController::Cookies
 
-            before_action :set_user
+						before_action :set_user
+						before_action :is_authenticate, only:[:show,:index, :update]
 
             def index
                 user = User.order(created_at: :desc);
                 render json: {status: 'Success', data: user};
             end
 
-            def show                
-                begin
-                    user = User.find_by(id: params.fetch(:id));                
-                    render json: {status: 'Success', data: user}, status: :ok;                
-                rescue
-                    render json: {data: 'error', status: 'Not Found'}
-                end
+            def show               
+							user = User.find_by(id: params.fetch(:id)); 
+							if user != nil
+								render json: {status: 'Success', data: user}, status: :ok;                
+							else
+								render json: {data: 'error', status: 'Not Found'}
+							end
             end
 
             def create
@@ -37,8 +38,8 @@ module Api
             def update
                 
                 # Check if user is login
-                if @service && @service.check_current_user(update_param.fetch('id', nil), cookies.fetch('token', nil))
-                    user = @service.update_user(user_params)
+                if UsersService.check_current_user(update_param.fetch('id', nil), cookies.fetch('token', nil))
+                    user = UsersService.update_user(user_params)
                     if user
                         render json: {status: 'Success', data: user}
                     else
@@ -50,12 +51,12 @@ module Api
             end
 
             def sign_in
-                if @service == nil
+                if !UsersService.is_loged_in()
 
                     # sign in and create cookies if authenticate
-                    @service = UsersService.new(nil, sign_in_params.fetch(:email, nil))              
-                    if @service.is_authenticate(sign_in_params.fetch(:password, nil))
-                        user = @service.add_token_to_cookie(cookies)
+                    UsersService.initialize(nil, sign_in_params.fetch(:email, nil))              
+                    if UsersService.is_authenticate(sign_in_params.fetch(:password, nil))
+                        user = UsersService.add_token_to_cookie(cookies)
                         render json: {status: 'Success', data: user}
                     else
                         render json: {status: :unauthorized, data: "email or password incorrect"}
@@ -67,10 +68,10 @@ module Api
 
             def sign_out
                 # check if we signed in 
-                if @service != nil
+                if UsersService.is_loged_in()
 
                     # remove the cookies
-                    @service.delete_cookie(cookies)
+                    UsersService.delete_cookie(cookies)
                     render json: {status: 'Success', data: "signed out"}
                 else 
                     render json: {status: 'Success', data: "there is no user signed in"} 
@@ -80,9 +81,15 @@ module Api
             def set_user
                 token = cookies.fetch('token', nil)
                 if token
-                    @service = UsersService.new(token)
+									UsersService.initialize(token)
                 end
-            end
+						end
+						
+						def is_authenticate
+							if !UsersService.is_loged_in()
+							  render json: {status: :unauthorized, data: 'user is not log in'};
+							end
+						end
 
             private
             def user_params
