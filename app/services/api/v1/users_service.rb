@@ -22,9 +22,10 @@ module Api
                 create_return_object()
             end
 
-            # remove the added cookies
+            # remove the cookies and the token
             def delete_cookie(cookies)
                 cookies.delete('token')
+                @user.update(token: '')
             end
 
             # check if there is a cookie and if the id is that one of the current user  

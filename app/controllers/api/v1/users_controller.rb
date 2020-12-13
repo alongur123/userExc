@@ -71,7 +71,7 @@ module Api
 
                     # remove the cookies
                     @service.delete_cookie(cookies)
-                    render json: {status: 'Success', data: "signed 0ut"}
+                    render json: {status: 'Success', data: "signed out"}
                 else 
                     render json: {status: 'Success', data: "there is no user signed in"} 
                 end
